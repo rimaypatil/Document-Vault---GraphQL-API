@@ -7,10 +7,12 @@
   "scripts": {
     "dev": "bun --watch src/server.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
     "gendb": "prisma migrate deploy && prisma generate",
     "test": "bun test",
     "test:unit": "bun test tests/unit",
-    "test:integration": "bun test tests/integration"
+    "test:integration": "bun test tests/integration",
+    "sanity": "bun run lint && bun run typecheck && bun test"
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
