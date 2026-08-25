@@ -41,6 +41,7 @@ input CreateDocumentInput {
 }
 
 input UpdateDocumentInput {
+  id: ID!
   title: String
   content: String
   tags: [String!]
@@ -62,7 +63,7 @@ type Query {
 type Mutation {
   createCollection(input: CreateCollectionInput!): Collection!
   createDocument(input: CreateDocumentInput!): Document!
-  updateDocument(id: ID!, input: UpdateDocumentInput!): Document!
+  updateDocument(input: UpdateDocumentInput!): Document!
   deleteDocument(id: ID!): Boolean!
-  moveDocument(id: ID!, targetCollectionId: ID!): Document!
+  moveDocument(id: ID!, collectionId: ID!): Document!
 }

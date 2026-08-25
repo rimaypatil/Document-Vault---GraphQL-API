@@ -155,34 +155,126 @@ export const resolvers = {
         throw error;
       }
     },
-    updateDocument: (
+    updateDocument: async (
       _parent: unknown,
-      _args: {
-        id: string;
+      args: {
         input: {
+          id: string;
           title?: string;
           content?: string;
           tags?: string[];
           isArchived?: boolean;
         };
       },
-      _context: GraphQLContext
+      context: GraphQLContext
     ) => {
-      throw new Error("Mutation not implemented yet");
+      const { id, title, content, tags, isArchived } = args.input;
+
+      if (title !== undefined && title.trim() === "") {
+        throw new GraphQLError("Title cannot be empty.");
+      }
+
+      if (content !== undefined && content.trim() === "") {
+        throw new GraphQLError("Content cannot be empty.");
+      }
+
+      const dataToUpdate: Prisma.DocumentUpdateInput = {};
+
+      if (title !== undefined) {
+        dataToUpdate.title = title;
+      }
+      if (content !== undefined) {
+        dataToUpdate.content = content;
+      }
+      if (tags !== undefined) {
+        dataToUpdate.tags = tags;
+      }
+      if (isArchived !== undefined) {
+        dataToUpdate.isArchived = isArchived;
+      }
+
+      try {
+        return await context.prisma.document.update({
+          where: {
+            id,
+          },
+          data: dataToUpdate,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Document not found.");
+        }
+        throw error;
+      }
     },
-    deleteDocument: (
+    deleteDocument: async (
       _parent: unknown,
-      _args: { id: string },
-      _context: GraphQLContext
+      args: { id: string },
+      context: GraphQLContext
     ) => {
-      throw new Error("Mutation not implemented yet");
+      try {
+        await context.prisma.document.delete({
+          where: {
+            id: args.id,
+          },
+        });
+        return true;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Document not found.");
+        }
+        throw error;
+      }
     },
-    moveDocument: (
+    moveDocument: async (
       _parent: unknown,
-      _args: { id: string; targetCollectionId: string },
-      _context: GraphQLContext
+      args: { id: string; collectionId: string },
+      context: GraphQLContext
     ) => {
-      throw new Error("Mutation not implemented yet");
+      const { id, collectionId } = args;
+
+      const documentExists = await context.prisma.document.findUnique({
+        where: { id },
+      });
+
+      if (!documentExists) {
+        throw new GraphQLError("Document not found.");
+      }
+
+      const collectionExists = await context.prisma.collection.findUnique({
+        where: { id: collectionId },
+      });
+
+      if (!collectionExists) {
+        throw new GraphQLError("Collection not found.");
+      }
+
+      try {
+        return await context.prisma.document.update({
+          where: {
+            id,
+          },
+          data: {
+            collectionId,
+          },
+        });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError) {
+          if (error.code === "P2025") {
+            throw new GraphQLError("Document not found.");
+          }
+          if (error.code === "P2003") {
+            throw new GraphQLError("Collection not found.");
+          }
+        }
+        throw error;
+      }
     },
   },
 };
