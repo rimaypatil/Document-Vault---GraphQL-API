@@ -18,24 +18,90 @@ export const resolvers = {
         },
       });
     },
-    documents: (
+    documents: async (
       _parent: unknown,
-      _args: {
+      args: {
         collectionId?: string;
         search?: string;
         isArchived?: boolean;
         take?: number;
         cursor?: string;
       },
-      _context: GraphQLContext
+      context: GraphQLContext
     ) => {
-      return {
-        nodes: [],
-        pageInfo: {
-          hasNextPage: false,
-          endCursor: null,
-        },
-      };
+      const { collectionId, search, isArchived, cursor } = args;
+      const take = args.take ?? 10;
+
+      if (args.take !== undefined) {
+        if (args.take <= 0) {
+          throw new GraphQLError("take must be greater than zero.");
+        }
+        if (args.take > 100) {
+          throw new GraphQLError("take cannot be greater than 100.");
+        }
+      }
+
+      const where: Prisma.DocumentWhereInput = {};
+
+      if (collectionId) {
+        where.collectionId = collectionId;
+      }
+
+      if (isArchived !== undefined) {
+        where.isArchived = isArchived;
+      }
+
+      if (search) {
+        const trimmedSearch = search.trim();
+        if (trimmedSearch !== "") {
+          where.OR = [
+            {
+              title: {
+                contains: trimmedSearch,
+                mode: "insensitive",
+              },
+            },
+            {
+              content: {
+                contains: trimmedSearch,
+                mode: "insensitive",
+              },
+            },
+          ];
+        }
+      }
+
+      try {
+        const documents = await context.prisma.document.findMany({
+          where,
+          orderBy: [
+            { createdAt: "asc" },
+            { id: "asc" },
+          ],
+          take: take + 1,
+          ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        });
+
+        const hasNextPage = documents.length > take;
+        const nodes = hasNextPage ? documents.slice(0, take) : documents;
+        const endCursor = nodes.length > 0 ? nodes[nodes.length - 1].id : null;
+
+        return {
+          nodes,
+          pageInfo: {
+            hasNextPage,
+            endCursor,
+          },
+        };
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          (error.code === "P2025" || error.code === "P2016" || error.code === "P2001")
+        ) {
+          throw new GraphQLError("Invalid cursor.");
+        }
+        throw error;
+      }
     },
   },
   Collection: {
