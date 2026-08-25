@@ -1,12 +1,22 @@
+import { Prisma } from "@prisma/client";
+import { GraphQLError } from "graphql";
 import type { GraphQLContext } from "./context";
 
 export const resolvers = {
   Query: {
-    collections: (_parent: unknown, _args: unknown, _context: GraphQLContext) => {
-      return [];
+    collections: async (_parent: unknown, _args: unknown, context: GraphQLContext) => {
+      return await context.prisma.collection.findMany({
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
     },
-    collection: (_parent: unknown, _args: { id: string }, _context: GraphQLContext) => {
-      return null;
+    collection: async (_parent: unknown, args: { id: string }, context: GraphQLContext) => {
+      return await context.prisma.collection.findUnique({
+        where: {
+          id: args.id,
+        },
+      });
     },
     documents: (
       _parent: unknown,
@@ -28,13 +38,52 @@ export const resolvers = {
       };
     },
   },
+  Collection: {
+    createdAt: (parent: { createdAt: Date | string }) => {
+      return parent.createdAt instanceof Date
+        ? parent.createdAt.toISOString()
+        : parent.createdAt;
+    },
+    documents: async (parent: { id: string }, _args: unknown, context: GraphQLContext) => {
+      return await context.prisma.document.findMany({
+        where: {
+          collectionId: parent.id,
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+      });
+    },
+  },
+  Document: {
+    createdAt: (parent: { createdAt: Date | string }) => {
+      return parent.createdAt instanceof Date
+        ? parent.createdAt.toISOString()
+        : parent.createdAt;
+    },
+  },
   Mutation: {
-    createCollection: (
+    createCollection: async (
       _parent: unknown,
-      _args: { input: { name: string; slug: string } },
-      _context: GraphQLContext
+      args: { input: { name: string; slug: string } },
+      context: GraphQLContext
     ) => {
-      throw new Error("Mutation not implemented yet");
+      try {
+        return await context.prisma.collection.create({
+          data: {
+            name: args.input.name,
+            slug: args.input.slug,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          throw new GraphQLError("A collection with this slug already exists.");
+        }
+        throw error;
+      }
     },
     createDocument: (
       _parent: unknown,
