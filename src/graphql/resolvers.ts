@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { GraphQLError } from "graphql";
 import type { GraphQLContext } from "./context";
+import {
+  validateCollectionName,
+  validateDocumentContent,
+  validateDocumentTitle,
+  validateSlug,
+} from "./validation";
 
 export const resolvers = {
   Query: {
@@ -151,10 +157,13 @@ export const resolvers = {
       args: { input: { name: string; slug: string } },
       context: GraphQLContext
     ) => {
+      const name = validateCollectionName(args.input.name);
+      validateSlug(args.input.slug);
+
       try {
         return await context.prisma.collection.create({
           data: {
-            name: args.input.name,
+            name,
             slug: args.input.slug,
           },
         });
@@ -181,15 +190,9 @@ export const resolvers = {
       },
       context: GraphQLContext
     ) => {
-      const { title, content, tags, collectionId, isArchived } = args.input;
-
-      if (!title || title.trim() === "") {
-        throw new GraphQLError("Title cannot be empty.");
-      }
-
-      if (!content || content.trim() === "") {
-        throw new GraphQLError("Content cannot be empty.");
-      }
+      const title = validateDocumentTitle(args.input.title);
+      const content = validateDocumentContent(args.input.content);
+      const { tags, collectionId, isArchived } = args.input;
 
       const collectionExists = await context.prisma.collection.findUnique({
         where: {
@@ -235,22 +238,13 @@ export const resolvers = {
       context: GraphQLContext
     ) => {
       const { id, title, content, tags, isArchived } = args.input;
-
-      if (title !== undefined && title.trim() === "") {
-        throw new GraphQLError("Title cannot be empty.");
-      }
-
-      if (content !== undefined && content.trim() === "") {
-        throw new GraphQLError("Content cannot be empty.");
-      }
-
       const dataToUpdate: Prisma.DocumentUpdateInput = {};
 
       if (title !== undefined) {
-        dataToUpdate.title = title;
+        dataToUpdate.title = validateDocumentTitle(title);
       }
       if (content !== undefined) {
-        dataToUpdate.content = content;
+        dataToUpdate.content = validateDocumentContent(content);
       }
       if (tags !== undefined) {
         dataToUpdate.tags = tags;
