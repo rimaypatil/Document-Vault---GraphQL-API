@@ -61,6 +61,23 @@ export const resolvers = {
         ? parent.createdAt.toISOString()
         : parent.createdAt;
     },
+    collection: async (
+      parent: { collectionId: string },
+      _args: unknown,
+      context: GraphQLContext
+    ) => {
+      const collection = await context.prisma.collection.findUnique({
+        where: {
+          id: parent.collectionId,
+        },
+      });
+
+      if (!collection) {
+        throw new GraphQLError("Collection not found.");
+      }
+
+      return collection;
+    },
   },
   Mutation: {
     createCollection: async (
@@ -85,19 +102,58 @@ export const resolvers = {
         throw error;
       }
     },
-    createDocument: (
+    createDocument: async (
       _parent: unknown,
-      _args: {
+      args: {
         input: {
           title: string;
           content: string;
           tags?: string[];
           collectionId: string;
+          isArchived?: boolean;
         };
       },
-      _context: GraphQLContext
+      context: GraphQLContext
     ) => {
-      throw new Error("Mutation not implemented yet");
+      const { title, content, tags, collectionId, isArchived } = args.input;
+
+      if (!title || title.trim() === "") {
+        throw new GraphQLError("Title cannot be empty.");
+      }
+
+      if (!content || content.trim() === "") {
+        throw new GraphQLError("Content cannot be empty.");
+      }
+
+      const collectionExists = await context.prisma.collection.findUnique({
+        where: {
+          id: collectionId,
+        },
+      });
+
+      if (!collectionExists) {
+        throw new GraphQLError("Collection not found.");
+      }
+
+      try {
+        return await context.prisma.document.create({
+          data: {
+            title,
+            content,
+            tags: tags ?? [],
+            collectionId,
+            ...(isArchived !== undefined ? { isArchived } : {}),
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2003"
+        ) {
+          throw new GraphQLError("Collection not found.");
+        }
+        throw error;
+      }
     },
     updateDocument: (
       _parent: unknown,

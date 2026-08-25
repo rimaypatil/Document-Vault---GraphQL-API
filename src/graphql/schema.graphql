@@ -37,6 +37,7 @@ input CreateDocumentInput {
   content: String!
   tags: [String!]
   collectionId: ID!
+  isArchived: Boolean
 }
 
 input UpdateDocumentInput {
