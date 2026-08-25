@@ -4,20 +4,20 @@ import { resolvers } from "./graphql/resolvers";
 
 const typeDefs: string = await Bun.file("src/graphql/schema.graphql").text();
 
-const schema = createSchema({
+export const schema = createSchema({
   typeDefs,
   resolvers,
 });
 
-const yoga = createYoga({
+export const yoga = createYoga({
   schema,
   context: createContext,
   graphqlEndpoint: "/graphql",
 });
 
-const PORT: number = Number(process.env.PORT) || 4000;
+const PORT: number = process.env.NODE_ENV === "test" ? 0 : (Number(process.env.PORT) || 4000);
 
-const server = Bun.serve({
+export const server = Bun.serve({
   port: PORT,
   fetch: yoga.fetch,
 });
